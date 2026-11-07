@@ -1,4 +1,4 @@
-# Getting started with JSM HQ
+# Getting started with BasePod HQ
 
 This guide takes you from a fresh machine to a team of AI agents working on your repo. It takes about 15 minutes, most of it installing tools. You only do it once.
 
@@ -107,7 +107,7 @@ Tip: add a short `plan.md` (stack, features, phases) and push it before starting
 From your project's folder:
 
 ```bash
-npx @therealjsmastery/jsm-hq@latest
+npx @basepodapps/basepod-hq@latest
 ```
 
 `@latest` makes sure npx doesn't reuse an old version it cached. HQ opens your browser. If it doesn't, open the `http://127.0.0.1:7420/?token=…` link printed in the terminal.

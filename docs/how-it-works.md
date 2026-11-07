@@ -1,4 +1,4 @@
-# How JSM HQ works
+# How BasePod HQ works
 
 What HQ does behind the office: where agents work, how they talk, what reaches GitHub, and what HQ saves. New here? Start with the [getting-started guide](getting-started.md).
 

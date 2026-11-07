@@ -1,16 +1,16 @@
 {
-  "name": "@therealjsmastery/jsm-hq",
+  "name": "@basepodapps/basepod-hq",
   "version": "0.7.4",
   "description": "Run a team of AI coding agents (Claude Code, Codex) on your repo in Docker Sandboxes, and watch them work in a pixel-art office.",
   "license": "MIT",
   "type": "module",
-  "homepage": "https://github.com/jsmastery-pro/jsm-hq#readme",
+  "homepage": "https://github.com/basepodapps/basepod-hq#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jsmastery-pro/jsm-hq.git"
+    "url": "git+https://github.com/basepodapps/basepod-hq.git"
   },
   "bugs": {
-    "url": "https://github.com/jsmastery-pro/jsm-hq/issues"
+    "url": "https://github.com/basepodapps/basepod-hq/issues"
   },
   "keywords": [
     "ai",
@@ -28,7 +28,7 @@
     "developer-tools"
   ],
   "bin": {
-    "jsm-hq": "bin/jsm-hq.mjs"
+    "basepod-hq": "bin/basepod-hq.mjs"
   },
   "publishConfig": {
     "access": "public"

@@ -1,112 +1,70 @@
-# JSM HQ
+# BasePod HQ
 
-**Run a team of AI coding agents on your repo, and watch them work in a pixel-art office.**
+**Run a team of AI coding agents on your repo, and watch them work in a pixel-art office. Now with Bitbucket.**
 
-[![npm](https://img.shields.io/npm/v/@therealjsmastery/jsm-hq?color=cb3837&label=npm)](https://www.npmjs.com/package/@therealjsmastery/jsm-hq)
-[![license](https://img.shields.io/npm/l/@therealjsmastery/jsm-hq)](LICENSE)
-[![node](https://img.shields.io/node/v/@therealjsmastery/jsm-hq)](https://nodejs.org)
+BasePod HQ is a fork of [JSM HQ](https://github.com/jsmastery-pro/jsm-hq) by JavaScript Mastery (MIT). All the credit for the idea, the pixel office and the agent team goes to them. This fork adds **Bitbucket Cloud support**, so you can use it without GitHub.
 
-![The JSM HQ office: a lead and two developers at their desks, the task board on the wall, pull requests on the board and the review gate on the belt](docs/images/office.png)
+## The story
 
-One **lead** agent plans the work and hands out tasks. Each **worker** gets its own desk, its own copy of your repo and its own Docker Sandbox, then opens a pull request. You see it all happen: the plan on the wall, agents at their desks, PRs moving through review.
+One early morning, someone woke up to an email about a fun AI tool for running a team of coding agents. She read it with her coffee-free brain and thought *this is great*, then found out it only works with GitHub. Her repos had moved to Bitbucket.
 
-Agents run **Claude Code** or **Codex**. Everything runs on your machine.
+So she did what anyone with an AI at hand would do: asked it to write a patch. A few hours, two live test runs and one very patient pair of agents later, the office had Bitbucket pull requests on its wall. If you're also a Bitbucket person who wants the nice AI goodies, this is for you.
 
-## Why use it
+## What this fork adds
 
-- **A real team, not one chat.** The lead splits the work into small tasks (one task, one branch, one PR) and assigns them. Agents message each other through HQ.
-- **Safe by default.** Each agent works in its own Docker Sandbox, a small VM that can't touch the rest of your computer. Websites are blocked until you allow them.
-- **You stay in charge.** Anything an agent needs from you (a decision, an API key, a blocked website) shows up in **Action items**. HQ never merges for you.
-- **Your workflow.** Pull requests on GitHub, reviewed by CodeRabbit, Greptile, Copilot or you.
-- **Knows your stack.** Pick your tools (Next.js, Clerk, Stripe, Supabase…) and agents get their official agent skills and docs access.
+- **Bitbucket Cloud mode.** HQ detects a `bitbucket.org` origin and switches over. PRs, approvals, review comments and merges are read from the Bitbucket REST API, and the task board follows along (To do, Doing, Review, Done).
+- **Agents never hold your credentials.** Your Bitbucket token stays in `~/.jsmhq/bitbucket.json` on your machine. Agents ask HQ, through the Team MCP, to push their branch (`open_pull_request`), read review comments (`get_pr_comments`), update from main (`sync_main`), and (lead only, if you choose) merge (`merge_pull_request`). Agent folders are treated as untrusted.
+- **Comments close the loop.** An unresolved review comment sends the PR back to its author to fix on the same PR. Bitbucket hides "Request changes" from a PR's author, and agents open PRs with your token, so an open comment counts as changes requested.
+- **33 tests** covering the mapping, branch-name safety, git hardening and the API client.
+
+Setup, differences from GitHub mode and the security reasoning are in **[docs/bitbucket.md](docs/bitbucket.md)**. GitHub mode still works as in upstream.
 
 ## Quick start
 
-From inside a git repo that has a GitHub remote (Bitbucket Cloud works too: see [docs/bitbucket.md](docs/bitbucket.md)):
+BasePod HQ isn't on npm yet, so run it from a clone. You need Node.js 20+, pnpm, git, tmux, and Docker Sandboxes (`sbx`). The [getting-started guide](docs/getting-started.md) covers each of these.
 
 ```bash
-npx @therealjsmastery/jsm-hq@latest
+git clone https://github.com/basepodapps/basepod-hq && cd basepod-hq
+pnpm install
+pnpm build
 ```
 
-HQ opens in your browser and walks you through the rest:
-
-1. **Welcome:** name the project and pick a lead and workers (Claude Code or Codex for each).
-2. **Setup checklist:** anything missing on your machine is listed with the command to fix it.
-3. **Start team** in the top bar, then message the lead, for example: *"Plan two small tasks for Dwight and assign the first one."*
-
-**First time?** The [getting-started guide](docs/getting-started.md) takes you from a fresh machine to a working team in about 15 minutes, on macOS, Linux and Windows.
-
-**Just trying it?** Use a throwaway repo:
+Then, in the repo you want a team to work on (a Bitbucket one, after the setup in [docs/bitbucket.md](docs/bitbucket.md)):
 
 ```bash
-mkdir hq-test && cd hq-test
-git init -b main && echo "# HQ test" > README.md && git add . && git commit -m init
-npx @therealjsmastery/jsm-hq@latest
+node /path/to/basepod-hq/bin/basepod-hq.mjs
 ```
 
-### Options
+HQ opens in your browser: name the project, pick a lead and workers, follow the setup checklist, press **Start team**, and message the lead. Try it on a throwaway repo first.
 
 ```
-jsm-hq --repo <path>   the repo to manage (default: current folder)
-       --port <n>      HQ port (default: 7420)
-       --no-open       don't open the browser
-       --version, --help
+basepod-hq --repo <path>   the repo to manage (default: current folder)
+           --port <n>      HQ port (default: 7420)
+           --no-open       don't open the browser
+           --version, --help
 ```
 
-Use it often? `npm install -g @therealjsmastery/jsm-hq`, then run `jsm-hq` in any repo.
+## Honest caveats
 
-## Requirements
+- **Tested with Claude Code on a Claude subscription only.** We haven't tried Codex, so we can't say how it behaves in Bitbucket mode or how it uses tokens. Codex agents keep the upstream behavior.
+- **Bitbucket Cloud only.** Bitbucket Server and Data Center are not supported.
+- **Agents use your usage.** A team of agents burns through a Claude plan quickly. On a Pro plan, set agents to Sonnet while you try it out.
+- **The hidden `.jsmhq` folders keep their upstream name** so this fork stays easy to merge with upstream and existing data keeps working.
 
-| What | Why |
-| --- | --- |
-| Node.js 20+ | Runs HQ |
-| git and a GitHub repo | Each agent clones it, pushes a branch and opens a PR |
-| GitHub CLI (`gh`) | Reads PRs and reviews |
-| Docker Sandboxes (`sbx`) | Each agent runs in its own VM |
-| tmux (macOS, Linux) | Agents keep running if you close HQ |
-| A Claude or ChatGPT account | For the agents themselves |
+## Planned
 
-Sandboxes need **macOS 14+ on Apple silicon, Windows 11, or Ubuntu 24.04+**. On other machines, set agents to **Local** in Settings → Team: they run Claude Code or Codex directly on your machine, with permission prompts on.
+Not built yet, so please don't count on them:
 
-You don't need to install these by hand first. HQ checks for each one and shows the exact command. The [getting-started guide](docs/getting-started.md) has every step.
-
-## How it works
-
-![An agent's drawer: its live terminal, its sandbox, websites it tried to reach, and tabs for its task and messages](docs/images/agent-drawer.png)
-
-1. **You tell the lead what to build.** It creates a board of small tasks, each with the files it may touch, and assigns them.
-2. **Workers build in their own sandboxes.** Each one pulls `main`, makes a branch, writes the code and opens a PR titled `[TASK-ID] …`.
-3. **HQ follows the PRs on GitHub.** Review comments go back to the author; a passing PR is reported to the lead; a merged PR marks the task done.
-4. **Agents ask when they're stuck.** A question, a blocked website or a missing key shows up in **Action items** and on the agent's card.
-5. **You review and merge.**
-
-Click any agent to open its drawer: its live terminal, a shell inside its sandbox, its task, its messages, and the websites it tried to reach. Drag the drawer's edge to make it wider, or maximize it. **Terminal** in the top bar opens your own shell in the repo or any agent's folder.
-
-More detail on workspaces, sandboxes, MCP servers, app variables and what HQ saves: **[How it works](docs/how-it-works.md)**.
-
-## Troubleshooting
-
-| Problem | Fix |
-| --- | --- |
-| A setup check shows "!" but the tool works | You may be on an old HQ. Run `npx @therealjsmastery/jsm-hq@latest` (npx can keep an old version cached). |
-| Start fails: "network policy has not been initialized" | A new Docker Sandboxes install needs a base policy once: `sbx policy init balanced`. |
-| Agents fail to start with a sign-in error | Your Docker sign-in expired. Run `sbx login`, then **Check again** in the setup checklist. |
-| Agents can't push or open PRs | Run `sbx secret set github --command "gh auth token"`, and check the repo has a GitHub `origin`. |
-| A Codex agent waits on "Do you trust this folder?" | Answer it once in the agent's terminal. HQ never answers trust prompts for you. |
-| A CLI sign-in in a sandbox opens the browser, then fails on `localhost:<port>` | Press **Forward port** in the agent's drawer, then reload the page. |
-| An agent's state never changes | The sandbox can't reach HQ. `sbx policy ls` should show `localhost:<port>` and `host.docker.internal:<port>` allowed; HQ adds them on start. |
-| "Port 7420 is in use" | Another HQ is running. Stop it, or use `--port 7421`. |
-| Windows: `listen EACCES` on start | Windows reserved that port. Use `--port 8420`. |
-| `posix_spawnp failed` when opening a terminal | Run `npx clear-npx-cache`, then `npx @therealjsmastery/jsm-hq@latest`. |
-
-**Remove a project:** delete each agent in Settings → Team (this removes its sandbox and, if you choose, its folder), then delete `~/.jsmhq/<project>`.
+- **Lite and Full team presets.** Lite keeps sub-agents on cheaper models, and Full runs the orchestrator's model everywhere. Full mode would carry a warning for Pro plans.
+- **Preset skills per agent role**, with a project's own skills taking priority.
+- **Re-notify after a restart** when a PR is still waiting on fixes (today a restart swallows it).
 
 ## Docs
 
-- [Getting started](docs/getting-started.md): install everything and run your first team.
-- [How it works](docs/how-it-works.md): workspaces, sandboxes, GitHub, MCP, settings and files.
-- [Contributing](CONTRIBUTING.md): run HQ from source and release it.
+- [Bitbucket Cloud](docs/bitbucket.md)
+- [Getting started](docs/getting-started.md) and [How it works](docs/how-it-works.md) (from upstream, renamed)
+- [Contributing](CONTRIBUTING.md)
 
 ## License
 
-Code: [MIT](LICENSE). The JSM HQ name and logo are not covered by the license; see [TRADEMARKS.md](TRADEMARKS.md).
+Code: [MIT](LICENSE), copyright JavaScript Mastery and BasePod Apps LLC. The names **JSM HQ**, **JavaScript Mastery** and **JSM** and their logos belong to JavaScript Mastery and are not covered by the license; see [TRADEMARKS.md](TRADEMARKS.md). BasePod HQ is an independent fork and isn't made, endorsed or supported by JavaScript Mastery.

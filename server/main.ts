@@ -1,6 +1,6 @@
-// jsm-hq — start HQ for the git repo you're in.
+// basepod-hq — start HQ for the git repo you're in.
 //
-//   jsm-hq [--repo <path>] [--port 7420] [--dev] [--no-open]
+//   basepod-hq [--repo <path>] [--port 7420] [--dev] [--no-open]
 //
 // --dev: the UI is served by Vite (pnpm dev:hq); HQ prints/opens the Vite URL.
 
@@ -98,7 +98,7 @@ async function main() {
   github.start();
 
   const url = `${uiOrigin}/?token=${uiToken}`;
-  log.info(`\n\n  JSM HQ is running → ${url}\n`);
+  log.info(`\n\n  BasePod HQ is running → ${url}\n`);
   if (!flag("no-open")) {
     // Windows: rundll32 hands the URL to the default browser without a shell (the token has no special chars, but `&` would).
     const [opener, args] = process.platform === "darwin" ? ["open", [url]] : process.platform === "win32" ? ["rundll32", ["url.dll,FileProtocolHandler", url]] : ["xdg-open", [url]];
@@ -119,15 +119,15 @@ async function main() {
 
 main().catch((err) => {
   if ((err as NodeJS.ErrnoException)?.code === "EADDRINUSE") {
-    log.error(`Port ${arg("port") ?? 7420} is in use — another HQ may be running. Stop it, or pick another port: npx @therealjsmastery/jsm-hq --port 7421`);
+    log.error(`Port ${arg("port") ?? 7420} is in use — another HQ may be running. Stop it, or pick another port: npx @basepodapps/basepod-hq --port 7421`);
     process.exit(1);
   }
   if ((err as NodeJS.ErrnoException)?.code === "EACCES") {
     const port = arg("port") ?? 7420;
     log.error(
       process.platform === "win32"
-        ? `Windows reserved port ${port} (Hyper-V, WSL and Docker reserve port ranges). Pick another: npx @therealjsmastery/jsm-hq --port 8420\n  See the reserved ranges with: netsh interface ipv4 show excludedportrange protocol=tcp`
-        : `Not allowed to use port ${port}. Pick another: npx @therealjsmastery/jsm-hq --port 8420`,
+        ? `Windows reserved port ${port} (Hyper-V, WSL and Docker reserve port ranges). Pick another: npx @basepodapps/basepod-hq --port 8420\n  See the reserved ranges with: netsh interface ipv4 show excludedportrange protocol=tcp`
+        : `Not allowed to use port ${port}. Pick another: npx @basepodapps/basepod-hq --port 8420`,
     );
     process.exit(1);
   }

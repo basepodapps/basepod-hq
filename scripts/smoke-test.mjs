@@ -1,4 +1,4 @@
-// Installs a packed jsm-hq tarball into an empty folder like a new user would,
+// Installs a packed basepod-hq tarball into an empty folder like a new user would,
 // then checks the parts that differ by OS: the terminal library loads and can
 // spawn, and HQ starts on a fresh repo and serves the page and a snapshot.
 //
@@ -54,8 +54,8 @@ try {
 } catch (e) {
   fail(`npm install failed:\n${e.stdout ?? ""}${e.stderr ?? ""}`);
 }
-const pkgRoot = join(app, "node_modules", "@therealjsmastery", "jsm-hq");
-const bin = join(pkgRoot, "bin", "jsm-hq.mjs");
+const pkgRoot = join(app, "node_modules", "@basepodapps", "basepod-hq");
+const bin = join(pkgRoot, "bin", "basepod-hq.mjs");
 step(`version ${sh(process.execPath, [bin, "--version"]).trim()}`);
 
 // 2. The terminal library loads its prebuilt binary and can spawn a process.

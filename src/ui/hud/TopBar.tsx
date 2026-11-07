@@ -41,7 +41,7 @@ export function TopBar() {
     <header className="panel fixed left-4 right-4 top-[10px] z-10 flex h-[50px] items-center gap-4 px-3">
       <div className="flex min-w-0 items-center gap-2.5">
         <Logo />
-        <b className="whitespace-nowrap text-[22px] font-bold tracking-[0.02em]">JSM HQ</b>
+        <b className="whitespace-nowrap text-[22px] font-bold tracking-[0.02em]">BasePod HQ</b>
         {!live && (
           <span className="chip shrink-0 text-[12px]" style={{ ["--c" as string]: "#ffec27" }} title="Running on mock data. Start the real HQ with `pnpm dev:hq`.">
             Demo data

@@ -13,5 +13,5 @@ export function OfficeCanvas() {
     return () => scene.destroy();
   }, []);
 
-  return <div ref={host} className="fixed inset-0" aria-label="Pixel-art view of the JSM HQ office" role="img" />;
+  return <div ref={host} className="fixed inset-0" aria-label="Pixel-art view of the BasePod HQ office" role="img" />;
 }

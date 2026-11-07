@@ -1,4 +1,4 @@
-# Using JSM HQ with Bitbucket Cloud
+# Using BasePod HQ with Bitbucket Cloud
 
 HQ was built around GitHub. With a Bitbucket Cloud `origin`, it switches to a Bitbucket mode:
 

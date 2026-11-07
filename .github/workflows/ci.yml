@@ -30,7 +30,7 @@ jobs:
         shell: bash
         run: mkdir -p pack && npm pack --ignore-scripts --pack-destination pack
       - name: CLI smoke test
-        run: node bin/jsm-hq.mjs --version && node bin/jsm-hq.mjs --help
+        run: node bin/basepod-hq.mjs --version && node bin/basepod-hq.mjs --help
       - name: Install and run like a new user
         shell: bash
         run: node scripts/smoke-test.mjs pack/*.tgz 7431

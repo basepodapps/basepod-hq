@@ -25,7 +25,7 @@ export interface RoleExtras {
 }
 
 /** HQ ≤ 0.3 wrote its role to ROLE.md; recognise that so it can be cleaned up. */
-const isHqRole = (text: string) => text.includes("## Team MCP (server `hq`)") && text.includes("You are managed by JSM HQ.");
+const isHqRole = (text: string) => text.includes("## Team MCP (server `hq`)") && (text.includes("You are managed by BasePod HQ.") || text.includes("You are managed by JSM HQ."));
 
 /**
  * The folder's own ROLE.md, if it has one (it's included in the generated role). A ROLE.md that an
@@ -57,7 +57,7 @@ export function hookScriptFor(agent: AgentConfig, dir: string): string | null {
   return join(dir, HOOK_SCRIPT).replace(/\\/g, "/");
 }
 
-const HOOK_SCRIPT_SOURCE = `// Written by JSM HQ (git-excluded). Sends this agent's hook events to HQ.
+const HOOK_SCRIPT_SOURCE = `// Written by BasePod HQ (git-excluded). Sends this agent's hook events to HQ.
 // Usage: node .jsmhq-hook.mjs <url> <token> [--print-reply] | --print-role
 import { readFileSync } from "node:fs";
 
@@ -167,10 +167,10 @@ export function roleMd(agent: AgentConfig, cfg: HqConfig, extras: RoleExtras = {
     ...(extras.ownRole?.trim() ? ["## From ROLE.md in this folder", extras.ownRole.trim(), ""] : []),
     "## Team MCP (server `hq`)",
     `Your tools: ${tools}.`,
-    "Messages that start with `[HQ]` come from JSM HQ: assignments from the lead, or messages from teammates. Act on them.",
+    "Messages that start with `[HQ]` come from BasePod HQ: assignments from the lead, or messages from teammates. Act on them.",
     "Teammates work in their own sandboxes and cannot see your files or terminal. Talk to them only with send_message.",
     "",
-    `Project: ${cfg.project.name} (${cfg.project.repo}). You are managed by JSM HQ.`,
+    `Project: ${cfg.project.name} (${cfg.project.repo}). You are managed by BasePod HQ.`,
     "",
   ].join("\n");
 }
@@ -256,5 +256,5 @@ export function excludeFromGit(dir: string, paths: string[]) {
   const file = ".git/info/exclude";
   const current = agentRead(dir, file) ?? "";
   const missing = paths.filter((p) => !current.split("\n").includes(p));
-  if (missing.length) agentWrite(dir, file, current + (current.endsWith("\n") || !current ? "" : "\n") + "# JSM HQ\n" + missing.join("\n") + "\n");
+  if (missing.length) agentWrite(dir, file, current + (current.endsWith("\n") || !current ? "" : "\n") + "# BasePod HQ\n" + missing.join("\n") + "\n");
 }

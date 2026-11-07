@@ -474,7 +474,7 @@ export class Sbx {
         file,
         `# App variables for ${this.hub.name(agentId)} (${this.hub.snap.config.project.name}).\n` +
           "# One KEY=value per line. These values ENTER the agent's VM — use test/dev credentials.\n" +
-          "# Restart the agent after editing. JSM HQ never reads or commits this file.\n",
+          "# Restart the agent after editing. BasePod HQ never reads or commits this file.\n",
         { mode: 0o600 },
       );
     }

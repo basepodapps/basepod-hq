@@ -45,7 +45,7 @@ export function codexConfig(agent: AgentConfig, cfg: HqConfig, token: string, di
   const url = hqUrl(agent, cfg.project.hqPort);
   const script = hookScriptFor(agent, dir);
   const lines = [
-    "# Written by JSM HQ for this agent (git-excluded). Codex loads it once you trust this folder.",
+    "# Written by BasePod HQ for this agent (git-excluded). Codex loads it once you trust this folder.",
     `developer_instructions = ${t(roleMd(agent, cfg, extras))}`,
     "",
     "[features]",

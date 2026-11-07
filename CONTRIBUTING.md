@@ -1,11 +1,11 @@
-# Contributing to JSM HQ
+# Contributing to BasePod HQ
 
 ## Run it from source
 
 Needs Node.js 20+ and pnpm 10 or 11 (`corepack enable` gets you pnpm).
 
 ```bash
-git clone https://github.com/jsmastery-pro/jsm-hq && cd jsm-hq
+git clone https://github.com/basepodapps/basepod-hq && cd basepod-hq
 pnpm install
 pnpm dev                                   # the UI with fake data, no agents
 HQ_REPO=~/developer/hq-test pnpm dev:hq    # the real HQ server + UI, with hot reload
@@ -33,7 +33,7 @@ src/
   office/    The PixiJS pixel office: layout, sprites, agents, belt
   ui/        Top bar, team panel, activity, drawers, settings, setup checklist, welcome
 server/      Local HQ server: setup checks, workspaces, sessions (tmux, or HQ-run on Windows), sbx, hooks, Team MCP, GitHub
-bin/         The jsm-hq command
+bin/         The basepod-hq command
 docs/        User guides, and the product spec (jsmhq-context.md)
 context/     Implementation plans
 ```
@@ -47,4 +47,4 @@ HQ calls the `sbx` CLI and reads its output. sbx 0.48 changed several outputs (f
 1. Bump `version` in `package.json` and merge to `main`.
 2. From a clean, up-to-date `main`, run `npm publish`. It builds first.
 
-Only members of the `therealjsmastery` npm org can publish. The README on npm updates only when a new version is published.
+BasePod HQ is not published to npm yet. Install it from a clone (see the README).

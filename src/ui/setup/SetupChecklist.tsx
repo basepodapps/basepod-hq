@@ -68,7 +68,7 @@ function CheckRow({ c, running, onRun }: { c: SetupCheck; running: boolean; onRu
   );
 }
 
-/** "Get JSM HQ ready": what's missing on this machine and how to fix it. */
+/** "Get BasePod HQ ready": what's missing on this machine and how to fix it. */
 export function SetupChecklist() {
   const setup = useOffice((s) => s.snap?.setup);
   const [runningId, setRunningId] = useState<string | null>(null);
@@ -78,7 +78,7 @@ export function SetupChecklist() {
     <div className="fixed inset-0 z-40 grid place-items-center bg-[rgba(36,26,46,0.55)] p-4" role="dialog" aria-modal="true" aria-label="Setup checklist">
       <div className="panel flex max-h-[calc(100dvh-2rem)] w-[min(760px,100%)] flex-col">
         <div className="flex items-center gap-3 border-b-[3px] border-ink px-4 py-2">
-          <h2 className="m-0 flex-1 text-[22px] font-bold">Get JSM HQ ready</h2>
+          <h2 className="m-0 flex-1 text-[22px] font-bold">Get BasePod HQ ready</h2>
           <button className="btn text-[14px]" onClick={() => officeActions.recheckSetup()}>
             Check again
           </button>
