@@ -22,7 +22,7 @@ Agents run **Claude Code** or **Codex**. Everything runs on your machine.
 
 ## Quick start
 
-From inside a git repo that has a GitHub remote:
+From inside a git repo that has a GitHub remote (Bitbucket Cloud works too: see [docs/bitbucket.md](docs/bitbucket.md)):
 
 ```bash
 npx @therealjsmastery/jsm-hq@latest

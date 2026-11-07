@@ -6,6 +6,7 @@ import type { AgentConfig, SetupCheck, SetupFix, SetupState } from "../src/data/
 import { usesTmux } from "./backends";
 import { parseCliJson, sandboxList } from "./lib/json";
 import { has, run } from "./lib/exec";
+import { checkAccess, CREDENTIALS_FILE, credentialsTooOpen, loadCredentials } from "./bitbucket";
 import type { RepoInfo } from "./repo";
 
 const SBX_DOCS = "https://docs.docker.com/ai/sandboxes/install/";
@@ -160,6 +161,34 @@ function checkRemote(repo: RepoInfo): Check {
   };
 }
 
+// Bitbucket projects: HQ itself reads PRs with an API token, and does the git push and
+// PR calls for the agents. The agents need nothing from Bitbucket inside their sandbox.
+async function checkBitbucket(repo: RepoInfo): Promise<Check> {
+  const base = { id: "bb" as const, label: "Bitbucket API token (reads PRs and reviews)", neededFor: "github" as const };
+  if (!repo.bitbucket) return { ...base, status: "missing", detail: "Needs a Bitbucket Cloud remote first.", fix: null };
+  if (!loadCredentials())
+    return {
+      ...base,
+      status: "missing",
+      detail: `No credentials in ${CREDENTIALS_FILE}. Create an Atlassian API token (or an app password) with pull request and repository access.`,
+      fix: fix(
+        `mkdir -p ~/.jsmhq && printf '{"user":"YOUR_EMAIL_OR_USERNAME","token":"YOUR_TOKEN"}' > ~/.jsmhq/bitbucket.json && chmod 600 ~/.jsmhq/bitbucket.json`,
+        false,
+        "https://id.atlassian.com/manage-profile/security/api-tokens",
+      ),
+    };
+  const err = await checkAccess(repo.bitbucket);
+  if (err) return { ...base, status: "warning", detail: err, fix: null };
+  if (credentialsTooOpen()) return { ...base, status: "warning", detail: `Works, but ${CREDENTIALS_FILE} is readable by other users.`, fix: fix(`chmod 600 ${CREDENTIALS_FILE}`, false, null) };
+  return { ...base, status: "ok", detail: `${repo.bitbucket} reachable`, fix: null };
+}
+
+function checkBitbucketRemote(repo: RepoInfo): Check {
+  const base = { id: "bb-remote" as const, label: "Bitbucket remote", neededFor: "github" as const };
+  if (repo.bitbucket) return { ...base, status: "ok", detail: repo.bitbucket, fix: null };
+  return { ...base, status: "warning", detail: repo.originUrl ? `origin is ${repo.originUrl} (not Bitbucket Cloud)` : "No origin remote.", fix: null };
+}
+
 async function checkGithubSecret(sbxOk: boolean): Promise<Check> {
   const base = { id: "github-secret" as const, label: "GitHub access inside sandboxes", neededFor: "sandbox" as const };
   if (!sbxOk) return { ...base, status: "missing", detail: "Waiting for sbx.", fix: null };
@@ -197,13 +226,16 @@ async function checkOpenAiSecret(sbxOk: boolean): Promise<Check> {
 /** `team` adds the Codex checks only when the team has Codex agents. */
 export async function runSetupChecks(repo: RepoInfo, team: AgentConfig[] = []): Promise<SetupState> {
   const brew = os === "darwin" && (await has("brew"));
-  const [osCheck, sbx, tmux, claude, gh] = await Promise.all([checkOs(), checkSbx(brew), checkTmux(brew), checkClaude(), checkGh(brew)]);
+  const bitbucket = repo.provider === "bitbucket";
+  const [osCheck, sbx, tmux, claude, gh] = await Promise.all([checkOs(), checkSbx(brew), checkTmux(brew), checkClaude(), bitbucket ? Promise.resolve(null) : checkGh(brew)]);
   const sbxOk = sbx.status === "ok";
-  const [login, secret] = await Promise.all([checkSbxLogin(sbxOk), checkGithubSecret(sbxOk)]);
+  const [login, secret] = await Promise.all([checkSbxLogin(sbxOk), bitbucket ? Promise.resolve(null) : checkGithubSecret(sbxOk)]);
   const policy = await checkSbxPolicy(login.status === "ok");
-  const checks: SetupCheck[] = [osCheck, sbx, login, policy, secret, tmux, claude, gh, checkRemote(repo)];
+  const checks: SetupCheck[] = bitbucket
+    ? [osCheck, sbx, login, policy, tmux, claude, await checkBitbucket(repo), checkBitbucketRemote(repo)]
+    : [osCheck, sbx, login, policy, secret!, tmux, claude, gh!, checkRemote(repo)];
   const codexAgents = team.filter((a) => a.cli === "codex");
-  if (codexAgents.some((a) => a.mode === "sandbox")) checks.splice(5, 0, await checkOpenAiSecret(sbxOk));
+  if (codexAgents.some((a) => a.mode === "sandbox")) checks.splice(checks.findIndex((c) => c.id === "tmux"), 0, await checkOpenAiSecret(sbxOk));
   if (codexAgents.some((a) => a.mode === "local")) checks.push(await checkCodex());
   const ok = (c: SetupCheck) => c.status === "ok";
   return {

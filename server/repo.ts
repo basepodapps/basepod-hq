@@ -9,6 +9,8 @@ export interface RepoInfo {
   name: string;
   originUrl: string | null;
   github: string | null; // "owner/name" when origin is GitHub
+  bitbucket: string | null; // "workspace/repo" when origin is Bitbucket Cloud
+  provider: "github" | "bitbucket" | null; // where PRs live
   hasCodeRabbit: boolean;
   hasInsta: boolean;
 }
@@ -20,11 +22,14 @@ export async function detectRepo(start: string): Promise<RepoInfo> {
   const origin = await run("git", ["remote", "get-url", "origin"], { cwd: root });
   const originUrl = origin.ok ? origin.stdout.trim() : null;
   const m = originUrl?.match(/github\.com[:/]([^/]+\/[^/]+?)(\.git)?$/);
+  const bb = originUrl?.match(/bitbucket\.org[:/]([^/]+\/[^/]+?)(\.git)?\/?$/);
   return {
     root,
     name: basename(root),
     originUrl,
     github: m ? m[1] : null,
+    bitbucket: bb ? bb[1] : null,
+    provider: m ? "github" : bb ? "bitbucket" : null,
     hasCodeRabbit: existsSync(join(root, ".coderabbit.yaml")) || existsSync(join(root, ".coderabbit.yml")),
     hasInsta: existsSync(join(root, ".insta")),
   };

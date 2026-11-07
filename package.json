@@ -53,7 +53,8 @@
     "build": "tsc --noEmit -p . && tsc --noEmit -p server && vite build && node scripts/build-server.mjs",
     "preview": "vite preview",
     "prepack": "npm run build",
-    "postinstall": "node scripts/fix-node-pty.mjs"
+    "postinstall": "node scripts/fix-node-pty.mjs",
+    "test:bitbucket": "tsx --test scripts/bitbucket.test.ts"
   },
   "dependencies": {
     "@fontsource/inter": "^5.3.0",

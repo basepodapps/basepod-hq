@@ -20,6 +20,8 @@ export const HQ_FILES = [ROLE_FILE, ".claude/settings.local.json", MCP_CONFIG, H
 export interface RoleExtras {
   ownRole?: string | null;
   hasEnvFile?: boolean;
+  /** Where PRs live. Bitbucket agents have no `gh` and no Bitbucket access: HQ pushes and opens PRs for them. */
+  provider?: "github" | "bitbucket" | null;
 }
 
 /** HQ ≤ 0.3 wrote its role to ROLE.md; recognise that so it can be cleaned up. */
@@ -104,22 +106,32 @@ export function hqUrl(agent: AgentConfig, port: number): string {
 
 export function roleMd(agent: AgentConfig, cfg: HqConfig, extras: RoleExtras = {}): string {
   const team = cfg.team.map((a) => `- ${a.name} — ${a.role}${a.isLead ? " (lead)" : ""}${a.id === agent.id ? " ← you" : ""}`).join("\n");
+  const bb = extras.provider === "bitbucket";
   const rules = agent.isLead
     ? [
         "You plan the work and assign it to the team. You never write app code.",
         "Keep tasks small: one task = one branch = one PR. Give each task the files it may edit and a clear done-when.",
         "Assign only to agents that are running and free (check list_workers).",
         cfg.workflow.merge.by === "lead"
-          ? "You merge PRs once they pass review (`gh pr merge <number> --squash --delete-branch`), one at a time, in an order that avoids conflicts. HQ tells you when each one passes."
+          ? `You merge PRs once they pass review (${bb ? "call the merge_pull_request tool with the PR number" : "`gh pr merge <number> --squash --delete-branch`"}), one at a time, in an order that avoids conflicts. HQ tells you when each one passes.`
           : "The user merges PRs; never merge one yourself. Decide the order they should land in, and tell the user if one blocks another.",
         "If the user changes who merges, HQ tells you. Follow the latest message.",
       ]
     : [
         "Work only on the task you were given. One task = one branch = one PR.",
-        "When HQ tells you to start a task, call get_my_task first, then `git pull origin main` and create a branch.",
-        "Edit only the files the task lists. Need another file? Ask the lead with send_message.",
-        "Title PRs `[TASK-ID] Short title` and open them with `gh pr create`, then call set_my_status in-review with the PR number.",
-        "set_my_status tells the lead automatically. Don't also send_message the same news.",
+        ...(bb
+          ? [
+              "When HQ tells you to start a task, call get_my_task first, then call sync_main and run the git command it returns (your sandbox can't reach Bitbucket, so HQ hands you the latest main as a file). Then create a branch named `<your-id>/<TASK-ID>-short-name` from origin/main.",
+              "Edit only the files the task lists. Need another file? Ask the lead with send_message.",
+              "Commit your work. Never run `git push` or look for Bitbucket credentials: you have none. Call open_pull_request with your branch name and a title like `[TASK-ID] Short title`; HQ pushes the branch and opens the PR. After fixing review comments, commit and call open_pull_request again to push the fixes.",
+              "open_pull_request marks your task in-review and tells the lead. Don't also send_message the same news.",
+            ]
+          : [
+              "When HQ tells you to start a task, call get_my_task first, then `git pull origin main` and create a branch.",
+              "Edit only the files the task lists. Need another file? Ask the lead with send_message.",
+              "Title PRs `[TASK-ID] Short title` and open them with `gh pr create`, then call set_my_status in-review with the PR number.",
+              "set_my_status tells the lead automatically. Don't also send_message the same news.",
+            ]),
         "If you are blocked or need a decision, call set_my_status blocked with the reason.",
       ];
   rules.push(
@@ -131,8 +143,8 @@ export function roleMd(agent: AgentConfig, cfg: HqConfig, extras: RoleExtras = {
       "Your sandbox blocks most websites and APIs. If a request you need is blocked (a docs page or an API: usually a 403 saying 'Approval required for <host>'), call request_access with the domain and why, then continue with other work until HQ tells you it was answered. Never work around the block.",
     );
   const tools = agent.isLead
-    ? "list_workers, get_status, list_tasks, create_board, create_task, update_task, assign_task, send_message, ask_user, request_access"
-    : "get_my_task, set_my_status, list_workers, get_status, list_tasks, send_message, ask_user, request_access";
+    ? "list_workers, get_status, list_tasks, create_board, create_task, update_task, assign_task, send_message, ask_user, request_access" + (bb ? ", merge_pull_request, get_pr_comments" : "")
+    : "get_my_task, set_my_status, list_workers, get_status, list_tasks, send_message, ask_user, request_access" + (bb ? ", sync_main, open_pull_request, get_pr_comments" : "");
   return [
     `# ${agent.name} — ${agent.role}`,
     "",

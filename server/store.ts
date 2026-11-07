@@ -56,7 +56,7 @@ export function newAgent(id: string, name: string, role: string, color: string, 
 
 function defaultConfig(repo: RepoInfo, port: number): HqConfig {
   return {
-    project: { id: slugify(repo.name), name: repo.name, repo: repo.github ?? repo.name, path: repo.root, hqPort: port },
+    project: { id: slugify(repo.name), name: repo.name, repo: repo.github ?? repo.bitbucket ?? repo.name, path: repo.root, hqPort: port },
     team: [newAgent(slugify(LEAD_NAME), LEAD_NAME, "Lead", "#ff77a8", true), newAgent(slugify(WORKER_NAMES[0]), WORKER_NAMES[0], "Developer", "#29adff", false)],
     workflow: {
       review: { enabled: true, tool: repo.hasCodeRabbit ? "coderabbit" : "human", command: "" },

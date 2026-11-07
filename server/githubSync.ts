@@ -1,34 +1,57 @@
 // Polls GitHub, keeps the office's PRs in sync, and runs the review automations:
 // comments → tell the author; passed → tell the lead; merged → task done.
 
-import type { PullRequest } from "../src/data/types";
-import { branchAgent, fetchPrs, OPEN_LIMIT, RateLimited, taskIdOf, toPullRequest } from "./github";
+import type { PullRequest, ReviewTool } from "../src/data/types";
+import { fetchPrs as fetchGithubPrs, branchAgent, OPEN_LIMIT, RateLimited, taskIdOf, toPullRequest } from "./github";
+import { BITBUCKET_BUDGET, fetchPrs as fetchBitbucketPrs } from "./bitbucket";
 import type { Hub } from "./hub";
 import { log } from "./lib/log";
 import type { Planner } from "./planner";
 
-const MERGE_CMD = (n: number | string) => `gh pr merge ${n} --squash --delete-branch`;
+export type Provider = "github" | "bitbucket";
+
+/** How the lead merges: GitHub has the `gh` CLI in its sandbox; Bitbucket goes through HQ's merge_pull_request tool. */
+const MERGE = {
+  github: { run: (n: number | string) => `run \`gh pr merge ${n} --squash --delete-branch\``, host: "GitHub" },
+  bitbucket: { run: (n: number | string) => `call the merge_pull_request tool with number ${n}`, host: "Bitbucket" },
+} as const;
 
 /** What the lead is told when a PR passes review: merge it, or leave it to the user (Settings → Workflow → Merge). */
-export function passedNotice(pr: Pick<PullRequest, "number" | "title">, author: string, by: "human" | "lead"): string {
+export function passedNotice(pr: Pick<PullRequest, "number" | "title">, author: string, by: "human" | "lead", provider: Provider = "github"): string {
   const head = `PR #${pr.number} (${pr.title}) by ${author} passed review.`;
+  const m = MERGE[provider];
   return by === "lead"
-    ? `${head} You merge PRs on this project: run \`${MERGE_CMD(pr.number)}\` now. If GitHub refuses (conflicts or failing checks), ask the author to fix it instead. Then assign the next task if anything is waiting.`
+    ? `${head} You merge PRs on this project: ${m.run(pr.number)} now. If ${m.host} refuses (conflicts or failing checks), ask the author to fix it instead. Then assign the next task if anything is waiting.`
     : `${head} It's ready for the user to merge. Don't merge it yourself.`;
 }
 
 /** What the lead is told when the user changes who merges, with the PRs already waiting. */
-export function mergeByNotice(by: "human" | "lead", waiting: number[]): string {
+export function mergeByNotice(by: "human" | "lead", waiting: number[], provider: Provider = "github"): string {
   if (by === "human") return "The user changed the workflow: the user merges PRs now. Don't merge PRs yourself.";
-  const list = waiting.length ? ` These passed review and are waiting: ${waiting.map((n) => `#${n}`).join(", ")}. Merge each with \`${MERGE_CMD("<number>")}\`.` : "";
+  const list = waiting.length ? ` These passed review and are waiting: ${waiting.map((n) => `#${n}`).join(", ")}. Merge each: ${MERGE[provider].run("<number>")}.` : "";
   return `The user changed the workflow: you now merge PRs once they pass review.${list}`;
 }
 
+/** Where PRs are read from. GitHub: the user's `gh` login. Bitbucket: HQ's own API token. */
+export interface PrSource {
+  provider: Provider;
+  name: string;
+  /** The setup check that must be "ok" before polling. */
+  checkId: "gh" | "bb";
+  /** How many API calls HQ may spend per hour; the rest is left for agents (GitHub) or the rate limit (Bitbucket). */
+  budget: number;
+  fetch: (repo: string, tool: ReviewTool) => ReturnType<typeof fetchGithubPrs>;
+}
+
+export const githubSource: PrSource = { provider: "github", name: "GitHub", checkId: "gh", budget: 1200, fetch: (repo) => fetchGithubPrs(repo) };
+export const bitbucketSource: PrSource = { provider: "bitbucket", name: "Bitbucket", checkId: "bb", budget: BITBUCKET_BUDGET, fetch: fetchBitbucketPrs };
+
 const MIN_POLL_MS = 20_000; // never more often than this (nudges included)
 const MAX_POLL_MS = 5 * 60_000;
-const HQ_BUDGET = 1200; // GraphQL points per hour HQ may use; the rest of the 5,000 is left for the agents' gh commands
 const LOW_REMAINING = 800; // below this, poll at most every 2 minutes
 const label = { coderabbit: "CodeRabbit", greptile: "Greptile", copilot: "Copilot", human: "The reviewer", custom: "The review check" } as const;
+
+const wfTool = (hub: Hub): ReviewTool => hub.snap.config.workflow.review.tool;
 
 export class GitHubSync {
   private prev = new Map<number, PullRequest>();
@@ -41,11 +64,11 @@ export class GitHubSync {
   private interval = MIN_POLL_MS;
   private pausedUntil = 0;
 
-  constructor(private hub: Hub, private planner: Planner, private repo: string | null) {}
+  constructor(private hub: Hub, private planner: Planner, private repo: string | null, private source: PrSource = githubSource) {}
 
   start() {
     if (!this.repo) {
-      log.warn("No GitHub remote: PRs and reviews are off.");
+      log.warn(`No ${this.source.name} remote: PRs and reviews are off.`);
       return;
     }
     void this.tick();
@@ -88,7 +111,7 @@ export class GitHubSync {
   /** Poll often enough to stay within HQ's share of the budget; slow down when it runs low. */
   private pace(rate: { cost: number; remaining: number } | null) {
     if (!rate) return;
-    const forBudget = Math.ceil((Math.max(1, rate.cost) * 3_600_000) / HQ_BUDGET);
+    const forBudget = Math.ceil((Math.max(1, rate.cost) * 3_600_000) / this.source.budget);
     const low = rate.remaining < LOW_REMAINING ? 120_000 : 0;
     this.interval = Math.min(MAX_POLL_MS, Math.max(MIN_POLL_MS, forBudget, low));
   }
@@ -97,12 +120,12 @@ export class GitHubSync {
     if (!this.repo || this.busy || Date.now() < this.pausedUntil) return;
     // Never closer together than the minimum gap (a nudge can land right after a regular poll).
     if (Date.now() - this.lastFetch < MIN_POLL_MS - 1000) return;
-    if (!this.hub.snap.setup.checks.find((c) => c.id === "gh" && c.status === "ok")) return;
+    if (!this.hub.snap.setup.checks.find((c) => c.id === this.source.checkId && c.status === "ok")) return;
     this.busy = true;
     this.lastFetch = Date.now();
     try {
-      const { open, merged, closed, rate } = await fetchPrs(this.repo);
-      if (this.lastError) log.info("GitHub reachable again");
+      const { open, merged, closed, rate } = await this.source.fetch(this.repo, wfTool(this.hub));
+      if (this.lastError) log.info(`${this.source.name} reachable again`);
       this.lastError = null;
       this.pace(rate);
       const wf = this.hub.snap.config.workflow;
@@ -135,7 +158,10 @@ export class GitHubSync {
       if (err instanceof RateLimited) {
         this.pausedUntil = err.resetAt.getTime() + 5000;
         const at = err.resetAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-        const msg = `GitHub API rate limit reached (shared with your agents' gh commands). PR sync paused until ${at}.`;
+        const msg =
+          this.source.provider === "github"
+            ? `GitHub API rate limit reached (shared with your agents' gh commands). PR sync paused until ${at}.`
+            : `Bitbucket API rate limit reached. PR sync paused until ${at}.`;
         if (msg !== this.lastError) {
           log.warn(msg);
           this.hub.activity("config", null, msg);
@@ -144,7 +170,7 @@ export class GitHubSync {
         return;
       }
       const msg = err instanceof Error ? err.message : String(err);
-      if (msg !== this.lastError) log.warn(`GitHub: ${msg}`);
+      if (msg !== this.lastError) log.warn(`${this.source.name}: ${msg}`);
       this.lastError = msg;
     } finally {
       this.busy = false;
@@ -187,13 +213,15 @@ export class GitHubSync {
         this.planner.notify(
           who,
           `${tool} reviewed your PR #${pr.number} (${pr.title}) and left ${n || "new"} open comment${n === 1 ? "" : "s"}. ` +
-            `Read them with \`gh pr view ${pr.number} --comments\` (or the GitHub API), fix them on the same branch, push, and resolve each thread you fixed.`,
+            (this.source.provider === "github"
+              ? `Read them with \`gh pr view ${pr.number} --comments\` (or the GitHub API), fix them on the same branch, push, and resolve each thread you fixed.`
+              : `Read them with the get_pr_comments tool (number ${pr.number}), fix them on the same branch, commit, and call open_pull_request again to push the fixes.`),
         );
     }
 
     if (pr.review === "passed" && old?.review !== "passed") {
       hub.activity("review.passed", who, `${tool} approved #${pr.number}`);
-      if (lead) this.planner.notify(lead.id, passedNotice(pr, hub.name(who), hub.snap.config.workflow.merge.by));
+      if (lead) this.planner.notify(lead.id, passedNotice(pr, hub.name(who), hub.snap.config.workflow.merge.by, this.source.provider));
     }
 
     if (pr.conflict && !old?.conflict && who)

@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import { makeCommands } from "./commands";
 import { startHttp } from "./http";
 import { Hub } from "./hub";
-import { GitHubSync } from "./githubSync";
+import { bitbucketSource, GitHubSync, githubSource } from "./githubSync";
 import { Inbox } from "./inbox";
 import { Planner } from "./planner";
 import { ActionItems } from "./actionItems";
@@ -42,7 +42,7 @@ async function main() {
   const token = agentToken(slug);
   const uiToken = browserToken(slug, dev);
 
-  log.info(`repo   ${repo.root}${repo.github ? `  (github.com/${repo.github})` : ""}`);
+  log.info(`repo   ${repo.root}${repo.github ? `  (github.com/${repo.github})` : repo.bitbucket ? `  (bitbucket.org/${repo.bitbucket})` : ""}`);
   log.info("checking setup…");
   const setup = await runSetupChecks(repo, config.team);
   for (const c of setup.checks) log.info(`  ${c.status === "ok" ? "✓" : c.status === "warning" ? "!" : "✗"} ${c.label}: ${c.detail}`);
@@ -94,7 +94,7 @@ async function main() {
   });
   sessions.startPolling();
   sbx.startApprovalPolling();
-  const github = new GitHubSync(hub, planner, repo.github);
+  const github = new GitHubSync(hub, planner, repo.provider === "bitbucket" ? repo.bitbucket : repo.github, repo.provider === "bitbucket" ? bitbucketSource : githubSource);
   github.start();
 
   const url = `${uiOrigin}/?token=${uiToken}`;

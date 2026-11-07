@@ -8,12 +8,12 @@ export interface RunResult {
 }
 
 /** Runs a program without a shell. Never throws; check `ok`. */
-export function run(cmd: string, args: string[], opts: { cwd?: string; timeoutMs?: number; input?: string } = {}): Promise<RunResult> {
+export function run(cmd: string, args: string[], opts: { cwd?: string; timeoutMs?: number; input?: string; env?: Record<string, string> } = {}): Promise<RunResult> {
   return new Promise((resolve) => {
     const child = execFile(
       cmd,
       args,
-      { cwd: opts.cwd, timeout: opts.timeoutMs ?? 20_000, maxBuffer: 8 * 1024 * 1024, env: process.env },
+      { cwd: opts.cwd, timeout: opts.timeoutMs ?? 20_000, maxBuffer: 8 * 1024 * 1024, env: opts.env ? { ...process.env, ...opts.env } : process.env },
       (err, stdout, stderr) => {
         const code = err && typeof (err as NodeJS.ErrnoException).code === "number" ? Number((err as NodeJS.ErrnoException).code) : err ? null : 0;
         resolve({ ok: !err, code: err ? (code ?? 1) : 0, stdout: String(stdout), stderr: String(stderr || (err && !stderr ? err.message : "")) });

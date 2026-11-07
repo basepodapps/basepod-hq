@@ -8,7 +8,10 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { z } from "zod";
 import type { Hub } from "./hub";
 import { requestAccess } from "./access";
+import { listComments, mergePr, openComments, openOrFindPr } from "./bitbucket";
+import { cleanBranch, defaultBranch, pushAgentBranch, writeBaseBundle } from "./bitbucketGit";
 import type { Planner } from "./planner";
+import { workspaceFor } from "./workspace";
 
 type Result = { content: { type: "text"; text: string }[]; isError?: boolean };
 
@@ -20,6 +23,17 @@ function guard<A>(fn: (args: A) => Result) {
   return async (args: A): Promise<Result> => {
     try {
       return fn(args);
+    } catch (err) {
+      return fail(err instanceof Error ? err.message : String(err));
+    }
+  };
+}
+
+/** Like guard, for tools that wait on git or the network. */
+function guardAsync<A>(fn: (args: A) => Promise<Result>) {
+  return async (args: A): Promise<Result> => {
+    try {
+      return await fn(args);
     } catch (err) {
       return fail(err instanceof Error ? err.message : String(err));
     }
@@ -155,7 +169,7 @@ function buildServer(hub: Hub, planner: Planner, me: string): McpServer {
       if (!t) return ok("You have no task right now. Wait for the lead, or ask with send_message.");
       if (t.status === "todo") planner.setStatus(me, "in-progress");
       const blockedBy = t.needs.filter((n) => planner.task(n)?.status !== "done");
-      return ok({ ...taskView(t.id), waitingOn: blockedBy, rules: "Work only on this task, on its own branch. Edit only the listed files. Title the PR `[" + t.id + "] " + t.title + "`. When the PR is open, call set_my_status with in-review and the PR number." });
+      return ok({ ...taskView(t.id), waitingOn: blockedBy, rules: "Work only on this task, on its own branch. Edit only the listed files. Title the PR `[" + t.id + "] " + t.title + "`. " + (hub.repo.provider === "bitbucket" ? "When your work is committed, call open_pull_request." : "When the PR is open, call set_my_status with in-review and the PR number.") });
     }),
   );
 
@@ -174,6 +188,80 @@ function buildServer(hub: Hub, planner: Planner, me: string): McpServer {
       return ok(`${t.id} is now ${t.status}.`);
     }),
   );
+
+  // Bitbucket: agents have no `gh` and no Bitbucket credentials, so HQ does the git push and the API calls for them.
+  const bitbucket = hub.repo.provider === "bitbucket" ? hub.repo.bitbucket : null;
+  if (bitbucket) {
+    const agentDir = () => {
+      const cfg = hub.cfg(me);
+      if (!cfg) throw new Error("Unknown agent.");
+      return workspaceFor(cfg, hub.slug);
+    };
+
+    server.registerTool(
+      "sync_main",
+      { description: "Bitbucket projects only. Your sandbox can't reach Bitbucket, so HQ fetches the latest main and puts it in your folder as a file. Returns the git command to run to bring it into your clone. Call it before you branch for a new task." },
+      guardAsync(async () => {
+        if (isLead) throw new Error("The lead doesn't write code.");
+        const base = await defaultBranch(hub.repo.root);
+        const cmd = await writeBaseBundle(hub.repo.root, agentDir(), base);
+        return ok(`Latest ${base} is in .hq/main.bundle. Run this in your clone, then create your branch from origin/${base}:\n${cmd}`);
+      }),
+    );
+
+    server.registerTool(
+      "open_pull_request",
+      {
+        description:
+          "Bitbucket projects only. HQ pushes your committed branch to Bitbucket and opens a PR for it (or, if one is already open for that branch, just pushes your new commits to it). Commit first. Marks your task in-review.",
+        inputSchema: {
+          branch: z.string().describe("Your branch, e.g. <your-id>/<TASK-ID>-short-name"),
+          title: z.string().optional().describe("Defaults to `[TASK-ID] task title`"),
+          description: z.string().optional().describe("A short summary of what changed and why"),
+        },
+      },
+      guardAsync(async ({ branch, title, description }: { branch: string; title?: string; description?: string }) => {
+        if (isLead) throw new Error("The lead doesn't open PRs.");
+        const task = planner.currentTask(me);
+        const b = cleanBranch(branch);
+        await pushAgentBranch(hub.repo.root, agentDir(), me, b);
+        const pr = await openOrFindPr(bitbucket, {
+          title: title?.trim() || (task ? `[${task.id}] ${task.title}` : b),
+          description: description?.trim() || "",
+          source: b,
+          destination: await defaultBranch(hub.repo.root),
+        });
+        if (task) planner.setStatus(me, "in-review", undefined, pr.number);
+        return ok(pr.created ? `Opened PR #${pr.number}: ${pr.url}` : `PR #${pr.number} was already open; your new commits are pushed to it: ${pr.url}`);
+      }),
+    );
+
+    server.registerTool(
+      "get_pr_comments",
+      {
+        description: "Bitbucket projects only. The open (unresolved) review comments on a PR: file, line, who, and what they said.",
+        inputSchema: { number: z.number().int() },
+      },
+      guardAsync(async ({ number }: { number: number }) => {
+        const open = openComments(await listComments(bitbucket, number));
+        return ok(open.length ? open : "No open review comments.");
+      }),
+    );
+
+    server.registerTool(
+      "merge_pull_request",
+      {
+        description: "Bitbucket projects only. Lead only, and only when the user has set the lead to merge. Squash-merges a PR that passed review and deletes its branch.",
+        inputSchema: { number: z.number().int() },
+      },
+      guardAsync(async ({ number }: { number: number }) => {
+        leadOnly();
+        if (hub.snap.config.workflow.merge.by !== "lead") throw new Error("The user merges PRs on this project. Don't merge; tell the user the PR is ready.");
+        await mergePr(bitbucket, number);
+        return ok(`Merged PR #${number}. HQ will see it within a few minutes and mark the task done.`);
+      }),
+    );
+  }
 
   server.registerTool(
     "ask_user",

@@ -86,7 +86,7 @@ Claude Code agents ask you to sign in the first time they start. Do it in the ag
 
 ## 5. Prepare a GitHub repo
 
-HQ works on a git repo that has a GitHub remote called `origin`. Each agent clones it, works on its own branch, and opens pull requests there. HQ follows those PRs and their reviews.
+HQ works on a git repo that has a GitHub remote called `origin` (for Bitbucket Cloud, see [bitbucket.md](bitbucket.md)). Each agent clones it, works on its own branch, and opens pull requests there. HQ follows those PRs and their reviews.
 
 **An existing project** that's already on GitHub: nothing to do. Just open a terminal in its folder.
 

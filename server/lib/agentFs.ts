@@ -36,7 +36,7 @@ export function agentMkdir(root: string, rel: string) {
 }
 
 /** Writes a file inside the agent's folder. A symlink in its place is replaced, never followed. */
-export function agentWrite(root: string, rel: string, data: string, opts?: WriteFileOptions) {
+export function agentWrite(root: string, rel: string, data: string | Uint8Array, opts?: WriteFileOptions) {
   const abs = agentPath(root, rel);
   mkdirSync(dirname(abs), { recursive: true });
   agentPath(root, rel);

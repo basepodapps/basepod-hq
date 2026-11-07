@@ -292,7 +292,7 @@ export function makeCommands(hub: Hub, sessions: Sessions, planner: Planner, inb
       const lead = hub.snap.config.team.find((a) => a.isLead);
       if (lead && wf.merge.by !== mergeBy) {
         const waiting = hub.snap.pullRequests.filter((pr) => pr.review === "passed" && !pr.merged && !pr.closed).map((pr) => pr.number);
-        planner.notify(lead.id, mergeByNotice(wf.merge.by, waiting));
+        planner.notify(lead.id, mergeByNotice(wf.merge.by, waiting, hub.repo.provider === "bitbucket" ? "bitbucket" : "github"));
       }
     },
 
